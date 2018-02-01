@@ -131,10 +131,8 @@ init = tf.global_variables_initializer()
 saver = tf.train.Saver()
 merged_summary_op = tf.summary.merge_all()
 
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
-
 # Launch the graph
-with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
+with tf.Session() as sess:
     sess.run(init)
     # Restore model weights from previously saved model
     prevModel = tf.train.get_checkpoint_state(checkpoint_dir)
