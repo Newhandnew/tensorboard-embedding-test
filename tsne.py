@@ -165,6 +165,7 @@ with tf.Session() as sess:
             summary_writer.add_summary(summary, epoch)
         if epoch % save_step == 0:
             # Save model weights to disk
+            sess.run(assignment, feed_dict={x: mnist.test.images[:test_size], y: mnist.test.labels[:test_size], is_training: False})
             checkpoint_path = os.path.join(checkpoint_dir, checkpoint_name)
             save_path = saver.save(sess, checkpoint_path)
             print("Model saved in file: {}".format(save_path))
