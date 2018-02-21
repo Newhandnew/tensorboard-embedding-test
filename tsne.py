@@ -40,17 +40,17 @@ def create_sprite_image(images):
     img_w = images.shape[2]
     n_plots = int(np.ceil(np.sqrt(images.shape[0])))
 
-    spriteimage = np.ones((img_h * n_plots, img_w * n_plots))
+    sprite_image = np.ones((img_h * n_plots, img_w * n_plots))
 
     for i in range(n_plots):
         for j in range(n_plots):
             this_filter = i * n_plots + j
             if this_filter < images.shape[0]:
                 this_img = images[this_filter]
-                spriteimage[i * img_h:(i + 1) * img_h,
+                sprite_image[i * img_h:(i + 1) * img_h,
                 j * img_w:(j + 1) * img_w] = this_img
 
-    return spriteimage
+    return sprite_image
 
 
 def vector_to_matrix_mnist(mnist_digits):
@@ -63,126 +63,129 @@ def invert_grayscale(mnist_digits):
     return 1 - mnist_digits
 
 
-# Parameters
-learning_rate = 1e-4
-total_epoch = 5001
-batch_size = 100
-display_step = 200
-save_step = 1000
-load_checkpoint = False
-checkpoint_dir = "checkpoint"
-checkpoint_name = 'model.ckpt'
-logs_path = "logs"
-test_size = 2000
-projector_path = 'projector'
+if __name__ == "__main__":
+    # Parameters
+    learning_rate = 1e-4
+    total_epoch = 5001
+    batch_size = 100
+    display_step = 200
+    save_step = 1000
+    load_checkpoint = False
+    checkpoint_dir = "checkpoint"
+    checkpoint_name = 'model.ckpt'
+    logs_path = "logs"
+    test_size = 2000
+    projector_path = 'projector'
 
-# Network Parameters
-n_input = 28 * 28 #784 # MNIST data input (img shape: 28*28)
-n_classes = 10 # MNIST total classes (0-9 digits)
-dropout_rate = 0.5 # Dropout, probability to keep units
+    # Network Parameters
+    n_input = 28 * 28   # 784 MNIST data input (img shape: 28*28)
+    n_classes = 10  # MNIST total classes (0-9 digits)
+    dropout_rate = 0.5  # Dropout, probability to keep units
 
-mnist = input_data.read_data_sets('MNIST-data', one_hot=True)
+    mnist = input_data.read_data_sets('MNIST-data', one_hot=True)
 
-# tf Graph input
-x = tf.placeholder(tf.float32, [None, n_input], name='InputData')
-y = tf.placeholder(tf.float32, [None, n_classes], name='LabelData')
-is_training = tf.placeholder(tf.bool, name='IsTraining')
-keep_prob = dropout_rate #tf.placeholder(tf.float32)  # dropout (keep probability)
+    # tf Graph input
+    x = tf.placeholder(tf.float32, [None, n_input], name='InputData')
+    y = tf.placeholder(tf.float32, [None, n_classes], name='LabelData')
+    is_training = tf.placeholder(tf.bool, name='IsTraining')
+    keep_prob = dropout_rate
 
-logits, fc1 = model(x, is_training, keep_prob, n_classes)
+    logits, fc1 = model(x, is_training, keep_prob, n_classes)
 
-with tf.name_scope('Loss'):
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y))
-tf.summary.scalar("loss", loss)
+    with tf.name_scope('Loss'):
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y))
+    tf.summary.scalar("loss", loss)
 
-with tf.name_scope('Accuracy'):
-    correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
-    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-tf.summary.scalar("accuracy", accuracy)
+    with tf.name_scope('Accuracy'):
+        correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
+        accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+    tf.summary.scalar("accuracy", accuracy)
 
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
 
-projectorDir = os.path.join(logs_path, projector_path)
-pathForMetadata = os.path.join(projectorDir,'metadata.tsv')
-pathForSprites = os.path.join(projectorDir, 'mnistdigits.png')
-# check project directory
-if not os.path.exists(projectorDir):
-    os.makedirs(projectorDir)
+    projector_dir = os.path.join(logs_path, projector_path)
+    path_metadata = os.path.join(projector_dir,'metadata.tsv')
+    path_sprites = os.path.join(projector_dir, 'mnistdigits.png')
+    # check project directory
+    if not os.path.exists(projector_dir):
+        os.makedirs(projector_dir)
 
-# embedding program
-mnistTest = input_data.read_data_sets('MNIST-data', one_hot=False)
-batchXTest = mnistTest.test.images[:test_size]
-batchYTest = mnistTest.test.labels[:test_size]
+    # embedding program
+    mnist_test = input_data.read_data_sets('MNIST-data', one_hot=False)
+    batch_x_test = mnist_test.test.images[:test_size]
+    batch_y_test = mnist_test.test.labels[:test_size]
 
-embedding_var = tf.Variable(tf.zeros([test_size, 1024]), name='embedding')
-assignment = embedding_var.assign(fc1)
+    embedding_var = tf.Variable(tf.zeros([test_size, 1024]), name='embedding')
+    assignment = embedding_var.assign(fc1)
 
-config = projector.ProjectorConfig()
-embedding = config.embeddings.add()
-embedding.tensor_name = embedding_var.name
-embedding.metadata_path = os.path.join(projector_path,'metadata.tsv')
-embedding.sprite.image_path = os.path.join(projector_path, 'mnistdigits.png')
-embedding.sprite.single_image_dim.extend([28,28])
+    config = projector.ProjectorConfig()
+    embedding = config.embeddings.add()
+    embedding.tensor_name = embedding_var.name
+    embedding.metadata_path = os.path.join(projector_path,'metadata.tsv')
+    embedding.sprite.image_path = os.path.join(projector_path, 'mnistdigits.png')
+    embedding.sprite.single_image_dim.extend([28,28])
 
-# Initializing the variables
-init = tf.global_variables_initializer()
+    # Initializing the variables
+    init = tf.global_variables_initializer()
 
-# 'Saver' op to save and restore all the variables
-saver = tf.train.Saver()
-merged_summary_op = tf.summary.merge_all()
+    # 'Saver' op to save and restore all the variables
+    saver = tf.train.Saver()
+    merged_summary_op = tf.summary.merge_all()
 
-# Launch the graph
-with tf.Session() as sess:
-    sess.run(init)
-    # Restore model weights from previously saved model
-    prevModel = tf.train.get_checkpoint_state(checkpoint_dir)
-    if load_checkpoint:
-        if prevModel:
-            saver.restore(sess, prevModel.model_checkpoint_path)
-            print('Checkpoint found, {}'.format(prevModel))
-        else:
-            print('No checkpoint found')
+    # Launch the graph
+    with tf.Session() as sess:
+        sess.run(init)
+        # Restore model weights from previously saved model
+        prev_model = tf.train.get_checkpoint_state(checkpoint_dir)
+        if load_checkpoint:
+            if prev_model:
+                saver.restore(sess, prev_model.model_checkpoint_path)
+                print('Checkpoint found, {}'.format(prev_model))
+            else:
+                print('No checkpoint found')
 
-    summary_writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
-    projector.visualize_embeddings(summary_writer, config)
-    startTime = time.time()
-    # Keep training until reach max iterations
-    for epoch in range(total_epoch):
-        batch_x, batch_y = mnist.train.next_batch(batch_size)
-        # reshapeX = np.reshape(batch_x, [-1, 28, 28, 1])
-        # Run optimization op (backprop)
-        sess.run(optimizer, feed_dict={x: batch_x, y: batch_y,
-                                       is_training: True})
-        if epoch % display_step == 0:
-            # Calculate batch loss and accuracy
-            cost, acc, summary = sess.run([loss, accuracy, merged_summary_op],
-                                          feed_dict={x: batch_x,
-                                                     y: batch_y,
-                                                     is_training: False})
-            elapsedTime = time.time() - startTime
-            startTime = time.time()
-            print('epoch {}, training accuracy: {:.4f}, loss: {:.5f}, time: {}'.format(epoch, acc, cost, elapsedTime))
-            summary_writer.add_summary(summary, epoch)
-        if epoch % save_step == 0:
-            # Save model weights to disk
-            sess.run(assignment, feed_dict={x: mnist.test.images[:test_size], y: mnist.test.labels[:test_size], is_training: False})
-            checkpoint_path = os.path.join(checkpoint_dir, checkpoint_name)
-            save_path = saver.save(sess, checkpoint_path)
-            print("Model saved in file: {}".format(save_path))
+        summary_writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
+        projector.visualize_embeddings(summary_writer, config)
+        start_time = time.time()
+        # Keep training until reach max iterations
+        for epoch in range(total_epoch):
+            batch_x, batch_y = mnist.train.next_batch(batch_size)
+            # reshapeX = np.reshape(batch_x, [-1, 28, 28, 1])
+            # Run optimization op (backprop)
+            sess.run(optimizer, feed_dict={x: batch_x, y: batch_y,
+                                           is_training: True})
+            if epoch % display_step == 0:
+                # Calculate batch loss and accuracy
+                cost, acc, summary = sess.run([loss, accuracy, merged_summary_op],
+                                              feed_dict={x: batch_x,
+                                                         y: batch_y,
+                                                         is_training: False})
+                elapsed_time = time.time() - start_time
+                start_time = time.time()
+                print('epoch {}, training accuracy: {:.4f}, loss: {:.5f}, time: {}'
+                      .format(epoch, acc, cost, elapsed_time))
+                summary_writer.add_summary(summary, epoch)
+            if epoch % save_step == 0:
+                # Save model weights to disk
+                sess.run(assignment, feed_dict={x: mnist.test.images[:test_size],
+                                                y: mnist.test.labels[:test_size], is_training: False})
+                checkpoint_path = os.path.join(checkpoint_dir, checkpoint_name)
+                save_path = saver.save(sess, checkpoint_path)
+                print("Model saved in file: {}".format(save_path))
 
-    # save to log path
-    saver.save(sess, os.path.join(logs_path, "model.ckpt"), 1)
-    # create sprite image file
-    to_visualise = batchXTest
-    to_visualise = vector_to_matrix_mnist(to_visualise)
-    to_visualise = invert_grayscale(to_visualise)
-    sprite_image = create_sprite_image(to_visualise)
-    # save sprite image file
-    plt.imsave(pathForSprites, sprite_image, cmap='gray')
-    # create metadata file
-    with open(pathForMetadata, 'w') as f:
-        f.write("Index\tLabel\n")
-        for index, label in enumerate(batchYTest):
-            f.write("%d\t%d\n" % (index, label))
+        # save to log path
+        saver.save(sess, os.path.join(logs_path, "model.ckpt"), 1)
+        # create sprite image file
+        to_visualise = batch_x_test
+        to_visualise = vector_to_matrix_mnist(to_visualise)
+        to_visualise = invert_grayscale(to_visualise)
+        sprite_image = create_sprite_image(to_visualise)
+        # save sprite image file
+        plt.imsave(path_sprites, sprite_image, cmap='gray')
+        # create metadata file
+        with open(path_metadata, 'w') as f:
+            f.write("Index\tLabel\n")
+            for index, label in enumerate(batch_y_test):
+                f.write("%d\t%d\n" % (index, label))
 
-    print("Optimization Finished!")
+        print("Optimization Finished!")
